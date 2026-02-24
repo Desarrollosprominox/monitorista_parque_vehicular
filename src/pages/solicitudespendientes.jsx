@@ -344,6 +344,7 @@ function TabsEstado({ value, onChange }) {
     { label: 'En proceso', value: 'En proceso' },
     { label: 'Por aprobar', value: 'Por aprobar' },
     { label: 'Aprobados', value: 'Aprobado' },
+    { label: 'Registrados por contabilidad', value: 'Registrado por contabilidad' },
   ];
   return (
     <div className="flex items-center gap-2">
@@ -512,6 +513,7 @@ function TicketsTable({ rows }) {
     const v = (e || '').toString().toLowerCase();
     if (v.includes('pend')) return 'bg-blue-50 text-blue-700 ring-blue-200';
     if (v.includes('por aprobar')) return 'bg-amber-50 text-amber-800 ring-amber-200';
+    if (v.includes('registrado por contabilidad')) return 'bg-indigo-50 text-indigo-700 ring-indigo-200';
     if (v.includes('revisión') || v.includes('revision') || v.includes('proceso')) return 'bg-sky-50 text-sky-700 ring-sky-200';
     if (v.includes('aprob')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
     if (v.includes('resuelta')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
