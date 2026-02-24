@@ -199,6 +199,18 @@ function TicketVehicularDetalle() {
                         // Rechazar: regresamos a Pendiente (puedes ajustar a otro estado si lo prefieres)
                         await updateVehicularTicketStatus(ticket.amv_ticketvehicularid, 'Pendiente');
                         setTicket(prev => ({ ...(prev || {}), amv_estado: 'En proceso' }));
+                        // Notificar a Power Automate tras rechazar
+                        try {
+                          const flowUrl = 'https://defaultdcbc0cef7e0e48419a93633aa4c88b.bf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7e2275b623144286af9c56bf9a53f5fb/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=k4FlvsyLy-YilA7vueNpY6MuZsR_MbUjIuNFA_DSYHQ';
+                          const guid = String(ticket.amv_ticketvehicularid).replace(/[{}"]/g, '');
+                          await fetch(flowUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ticketId: guid })
+                          });
+                        } catch (notifyErr) {
+                          console.warn('[TicketVehicularDetalle] No se pudo notificar flujo de rechazo:', notifyErr?.message || notifyErr);
+                        }
                         // Redirigir a listado
                         if (location.pathname.startsWith('/admin')) navigate('/admin');
                         else if (window.history && window.history.length > 1) navigate(-1);
