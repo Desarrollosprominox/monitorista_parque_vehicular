@@ -7,11 +7,8 @@ import SolicitudesPendientes from './pages/solicitudespendientes';
 import SolicitudesResueltas from './pages/SolicitudesResueltas';
 import TicketVehicularDetalle from './pages/TicketVehicularDetalle';
 import ProveedorNuevo from './pages/ProveedorNuevo';
-<<<<<<< HEAD
-=======
 import GestionMonitoristas from './pages/GestionMonitoristas';
 import AdministracionRoles from './pages/AdministracionRoles';
->>>>>>> a9fc0f8 (Modulo de gestión de monitoristas y Administración de roles)
 import { useAuth } from './hooks/useAuth';
 import { useState, useEffect } from 'react';
 import './App.css';
@@ -173,8 +170,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-<<<<<<< HEAD
-=======
           <Route
             path="/gestion-monitoristas"
             element={
@@ -195,7 +190,6 @@ function App() {
               </ProtectedRoute>
             }
           />
->>>>>>> a9fc0f8 (Modulo de gestión de monitoristas y Administración de roles)
           {/* Rutas para Administrador */}
           <Route
             path="/admin"

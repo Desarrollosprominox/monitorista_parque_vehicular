@@ -5,11 +5,8 @@ import {
   Home,
   CheckCircle2,
   Building2,
-<<<<<<< HEAD
-=======
   Users,
   Shield,
->>>>>>> a9fc0f8 (Modulo de gestión de monitoristas y Administración de roles)
   PanelLeftClose, 
   PanelLeftOpen 
 } from 'lucide-react';
@@ -88,8 +85,6 @@ function Sidebar({ onCollapse }) {
               </span>
             </Link>
           ))}
-<<<<<<< HEAD
-=======
 
           {/* Sección solo para administrador */}
           {role === 'admin' && (
@@ -131,7 +126,6 @@ function Sidebar({ onCollapse }) {
               </Link>
             </>
           )}
->>>>>>> a9fc0f8 (Modulo de gestión de monitoristas y Administración de roles)
         </nav>
 
         {/* User Info */}

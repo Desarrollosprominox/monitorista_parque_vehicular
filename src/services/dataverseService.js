@@ -512,8 +512,6 @@ export function useDataverseService() {
     }
   }, [getAccessToken]);
 
-<<<<<<< HEAD
-=======
   // Listar todos los registros de amv_monitoristas (para administración)
   const fetchMonitoristas = useCallback(async () => {
     try {
@@ -743,7 +741,6 @@ export function useDataverseService() {
     }
   }, [getAccessToken]);
 
->>>>>>> a9fc0f8 (Modulo de gestión de monitoristas y Administración de roles)
   // Obtener rol de usuario desde amv_rols comparando amv_correo; devuelve 'monitorista' | 'admin' | null
   const fetchUserRoleFromRols = useCallback(async (email) => {
     const safe = (email || '').toString().trim();
@@ -1911,15 +1908,12 @@ export function useDataverseService() {
     fetchVehicularFiles,
     downloadVehicularFile,
     fetchMonitoristaZonaByEmail,
-<<<<<<< HEAD
-=======
     fetchMonitoristas,
     createMonitorista,
     updateMonitorista,
     fetchRolesUsuarios,
     createRolUsuario,
     updateRolUsuario,
->>>>>>> a9fc0f8 (Modulo de gestión de monitoristas y Administración de roles)
     fetchUserRoleFromRols,
     fetchTickets,
     fetchClosedTickets,
