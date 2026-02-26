@@ -33,15 +33,22 @@ export function createBlobClient(apiBase) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName, contentType, providerId, documentType })
     });
-    if (res.status === 404) {
-      // Fallback sin /blob
-      res = await fetch(`${apiBase}/sas-upload-provider`, {
+    if (!res.ok) {
+      // Capturar mensaje del primer intento
+      let firstErr = '';
+      try { firstErr = (await safeJson(res)).error || ''; } catch {}
+      // Fallback sin /blob (aplicar también en 5xx)
+      const res2 = await fetch(`${apiBase}/sas-upload-provider`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName, contentType, providerId, documentType })
       });
+      if (!res2.ok) {
+        const secondErr = (await safeJson(res2)).error || firstErr || `SAS upload provider ${res2.status}`;
+        throw new Error(secondErr);
+      }
+      return res2.json();
     }
-    if (!res.ok) throw new Error((await safeJson(res)).error || `SAS upload provider ${res.status}`);
     return res.json(); // { uploadUrl, blobUrl, blobName }
   }
 

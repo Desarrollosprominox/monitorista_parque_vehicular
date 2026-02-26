@@ -1892,6 +1892,34 @@ export function useDataverseService() {
     }
   }, [getAccessToken]);
 
+  // Eliminar proveedor por id (rollback en caso de fallos al subir documentos)
+  const deleteProveedor = useCallback(async (proveedorId) => {
+    const guid = (proveedorId || '').toString().replace(/[{}"]/g, '');
+    if (!guid) throw new Error('Falta id del proveedor');
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('No se pudo obtener el token de acceso');
+      const setName = 'amv_proveedors';
+      const resp = await fetch(`${DATAVERSE_API_ENDPOINT}/${setName}(${guid})`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        }
+      });
+      if (!resp.ok && resp.status !== 204) {
+        const txt = await resp.text();
+        throw new Error(txt || `DELETE ${resp.status}`);
+      }
+      return true;
+    } catch (e) {
+      console.error('[deleteProveedor] Error:', e);
+      throw e;
+    }
+  }, [getAccessToken]);
+
   return {
     fetchVehicularTickets,
     fetchResolvedVehicularTickets,
@@ -1905,6 +1933,7 @@ export function useDataverseService() {
     deleteVehicularDiagnostico,
     searchProveedoresByNombre,
     createProveedor,
+    deleteProveedor,
     fetchVehicularFiles,
     downloadVehicularFile,
     fetchMonitoristaZonaByEmail,

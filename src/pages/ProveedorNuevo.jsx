@@ -7,7 +7,7 @@ import { Building2, Upload, Paperclip, FileText, X, CheckCircle } from 'lucide-r
 
 function ProveedorNuevo() {
   const navigate = useNavigate();
-  const { createProveedor } = useDataverseService();
+  const { createProveedor, deleteProveedor } = useDataverseService();
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [form, setForm] = useState({ amv_nombre: '', amv_ubicacion: '', amv_direccion: '', amv_correo: '', amv_telefono: '' });
@@ -87,7 +87,13 @@ function ProveedorNuevo() {
         const results = await Promise.allSettled(tasks);
         const fails = results.filter(r => r.status === 'rejected');
         if (fails.length > 0) {
-          alert(`Proveedor creado, pero ${fails.length} documento(s) no se pudieron subir. Corrige e inténtalo de nuevo.`);
+          // Rollback: eliminar el proveedor creado si falló alguna carga
+          try {
+            await deleteProveedor(providerId);
+          } catch (rbErr) {
+            console.warn('[ProveedorNuevo] Rollback fallido al eliminar proveedor:', rbErr?.message || rbErr);
+          }
+          alert(`No se pudo subir ${fails.length} documento(s). El proveedor no fue creado.`);
           setSaving(false);
           return;
         } else {
@@ -96,6 +102,20 @@ function ProveedorNuevo() {
       } else {
         alert('Proveedor creado correctamente.');
       }
+
+      // Notificar a Power Automate con el ID del proveedor creado
+      try {
+        const flowUrl = 'https://defaultdcbc0cef7e0e48419a93633aa4c88b.bf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/47c54599ba57451ab447d969ba2d799b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4pHc8GVAmsPoCEvJh6uNLW5SWj3GrSYJwRZeR8Lcq7Q';
+        await fetch(flowUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proveedorId: providerId })
+        });
+      } catch (notifyErr) {
+        // No bloquear flujo por notificación fallida, solo registrar
+        console.warn('[ProveedorNuevo] No se pudo notificar flujo de proveedor:', notifyErr?.message || notifyErr);
+      }
+
       navigate('/home');
     } catch (err) {
       alert(err?.message || 'No se pudo crear el proveedor');
