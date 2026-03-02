@@ -1,8 +1,9 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { loginRequest } from '../config/authConfig';
+import { loginRequest, identityRequest } from '../config/authConfig';
 import { DATAVERSE_API_ENDPOINT } from '../config/constants';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function useAuth() {
   const { instance, inProgress } = useMsal();
@@ -12,6 +13,8 @@ export function useAuth() {
     try { return localStorage.getItem('app.role') || null; } catch { return null; }
   });
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Log del rol cuando cambie (diagnóstico)
   useEffect(() => {
@@ -23,22 +26,21 @@ export function useAuth() {
   useEffect(() => {
     if (inProgress === InteractionStatus.None) {
       setIsLoading(false);
+      try {
+        const path = location?.pathname || '/';
+        if (isAuthenticated && (path === '/' || path === '/login')) {
+          navigate('/home', { replace: true });
+        }
+      } catch {}
     }
-  }, [inProgress]);
+  }, [inProgress, isAuthenticated, location, navigate]);
 
   const login = useCallback(async () => {
     try {
       if (inProgress === InteractionStatus.None) {
+        console.info('[Auth] Iniciando loginRedirect con scopes mínimos de identidad…');
         setIsLoading(true);
-        const response = await instance.loginPopup(loginRequest);
-        // Establecer la cuenta activa para permitir acquireTokenSilent inmediato
-        try {
-          if (response?.account) {
-            instance.setActiveAccount(response.account);
-          }
-        } catch {}
-        setIsLoading(false);
-        return response;
+        await instance.loginRedirect(identityRequest);
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -51,11 +53,11 @@ export function useAuth() {
   const logout = useCallback(async () => {
     try {
       if (inProgress === InteractionStatus.None) {
+        console.info('[Auth] Iniciando logoutRedirect…');
         setIsLoading(true);
-        await instance.logoutPopup({
+        await instance.logoutRedirect({
           postLogoutRedirectUri: window.location.origin,
         });
-        setIsLoading(false);
       }
     } catch (error) {
       console.error('Logout failed:', error);
@@ -67,17 +69,34 @@ export function useAuth() {
   const getAccessToken = useCallback(async () => {
     try {
       if (inProgress === InteractionStatus.None && isAuthenticated) {
+        console.debug('[Auth] acquireTokenSilent start…');
         setIsLoading(true);
         const response = await instance.acquireTokenSilent({
           ...loginRequest,
           account: instance.getAllAccounts()[0]
         });
+        console.debug('[Auth] acquireTokenSilent success');
         setIsLoading(false);
         return response.accessToken;
       }
     } catch (error) {
-      console.error('Error getting access token:', error);
+      console.warn('[Auth] acquireTokenSilent error:', error?.errorCode || error?.message || error);
       setError(error);
+      const code = String(error?.errorCode || '').toLowerCase();
+      const message = String(error?.message || '').toLowerCase();
+      const needsInteraction =
+        code.includes('interaction_required') ||
+        code.includes('consent_required') ||
+        code.includes('login_required') ||
+        code.includes('invalid_grant') ||
+        message.includes('interaction required') ||
+        message.includes('consent required') ||
+        message.includes('login required');
+      if (needsInteraction) {
+        console.info('[Auth] Requiere interacción: lanzando acquireTokenRedirect con prompt=consent…');
+        await instance.acquireTokenRedirect({ ...loginRequest, prompt: 'consent' });
+        return null;
+      }
       setIsLoading(false);
       throw error;
     }

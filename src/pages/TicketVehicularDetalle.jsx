@@ -74,6 +74,12 @@ function TicketVehicularDetalle() {
     (async () => {
       try {
         await updateVehicularTicketStatus(ticketGuid, 'En Revisión');
+        // Registrar timestamp de apertura en la primera transición a "En Revisión"
+        try {
+          await updateVehicularTicketFields(ticketGuid, { amv_tsabierto: new Date().toISOString() });
+        } catch (e) {
+          console.warn('[TicketVehicularDetalle] No se pudo registrar amv_tsabierto:', e?.message || e);
+        }
         setTicket(prev => ({ ...(prev || {}), amv_estado: 'En Revisión' }));
         try { sessionStorage.setItem(sessionKey, '1'); } catch {}
       } catch (e) {
@@ -153,7 +159,8 @@ function TicketVehicularDetalle() {
                         await updateVehicularTicketFields(ticket.amv_ticketvehicularid, {
                           amv_aprueba: String(approverEmail),
                           amv_estado: 'Por aprobar',
-                          amv_enviaraprobacion: true
+                          amv_enviaraprobacion: true,
+                          amv_tsmandadoaaprobacion: new Date().toISOString()
                         });
                         // Notificar a Power Automate con el GUID del ticket
                         try {
@@ -198,6 +205,12 @@ function TicketVehicularDetalle() {
                         setAdminActioning(true);
                         // Rechazar: regresamos a Pendiente (puedes ajustar a otro estado si lo prefieres)
                         await updateVehicularTicketStatus(ticket.amv_ticketvehicularid, 'Pendiente');
+                        // Registrar timestamp de rechazo
+                        try {
+                          await updateVehicularTicketFields(ticket.amv_ticketvehicularid, { amv_tsrechazado: new Date().toISOString() });
+                        } catch (e) {
+                          console.warn('[TicketVehicularDetalle] No se pudo registrar amv_tsrechazado:', e?.message || e);
+                        }
                         setTicket(prev => ({ ...(prev || {}), amv_estado: 'En proceso' }));
                         // Notificar a Power Automate tras rechazar
                         try {
@@ -232,6 +245,12 @@ function TicketVehicularDetalle() {
                       try {
                         setAdminActioning(true);
                         await updateVehicularTicketStatus(ticket.amv_ticketvehicularid, 'Aprobado');
+                        // Registrar timestamp de aprobación
+                        try {
+                          await updateVehicularTicketFields(ticket.amv_ticketvehicularid, { amv_tsaprobado: new Date().toISOString() });
+                        } catch (e) {
+                          console.warn('[TicketVehicularDetalle] No se pudo registrar amv_tsaprobado:', e?.message || e);
+                        }
                         setTicket(prev => ({ ...(prev || {}), amv_estado: 'Aprobado' }));
                         // Notificar a Power Automate tras aprobar
                         try {
@@ -443,24 +462,24 @@ function VehiculoDetails({ vehiculo }) {
     { label: 'Sucursal', value: v.amv_sucursal || '—', icon: <Building2 className="w-4 h-4 text-gray-500" /> },
   ];
   return (
-    <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18)] md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
+    <section className="rounded-2xl md:rounded-3xl border border-gray-100 bg-white p-4 md:p-6 shadow-sm md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
-      <div className="text-lg font-semibold text-gray-900 mb-4">Detalles del vehículo</div>
-      <div className="rounded-xl bg-[#F9FAFB] p-4 md:p-5">
+      <div className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">Detalles del vehículo</div>
+      <div className="rounded-xl bg-[#F9FAFB] p-3 md:p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map((it, idx) => (
           <div
             key={idx}
-            className="rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 bg-white p-3 md:p-4 transition-colors hover:bg-gray-50"
             style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: `${idx * 25}ms` }}
           >
             <div className="flex items-start gap-3">
               <div className="mt-[2px]">{it.icon}</div>
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-gray-500 font-medium">{it.label}</div>
-                <div className="mt-1 text-sm text-gray-900 font-medium">{it.value}</div>
+                <div className="mt-1 text-sm text-gray-900 font-medium break-words">{it.value}</div>
               </div>
             </div>
           </div>
@@ -496,31 +515,31 @@ function TicketDetails({ ticket }) {
   const descripcion = (t.amv_descripciondelproblema || '').toString().trim();
 
   return (
-    <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18)] md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
+    <section className="rounded-2xl md:rounded-3xl border border-gray-100 bg-white p-4 md:p-6 shadow-sm md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
-      <div className="text-lg font-semibold text-gray-900 mb-4">Detalles del ticket</div>
+      <div className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">Detalles del ticket</div>
 
       {/* Grid de sub-cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Tipo de servicio */}
         <div
-          className="rounded-xl border border-gray-200 bg-white p-4 transition-all duration-200 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white p-3 md:p-4 transition-all duration-200 hover:bg-gray-50"
           style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: '0ms' }}
         >
           <div className="flex items-start gap-3">
             <Wrench className="w-4 h-4 text-gray-500 mt-[2px]" />
             <div>
               <div className="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Tipo de servicio</div>
-              <div className="mt-1 text-sm text-gray-900 font-semibold">{t.amv_tipodeservicio || '—'}</div>
+              <div className="mt-1 text-sm text-gray-900 font-semibold break-words">{t.amv_tipodeservicio || '—'}</div>
             </div>
           </div>
         </div>
 
         {/* Prioridad */}
         <div
-          className="rounded-xl border border-gray-200 bg-white p-4 transition-all duration-200 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white p-3 md:p-4 transition-all duration-200 hover:bg-gray-50"
           style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: '40ms' }}
         >
           <div className="flex items-start gap-3">
@@ -538,21 +557,21 @@ function TicketDetails({ ticket }) {
 
         {/* Sucursal */}
         <div
-          className="rounded-xl border border-gray-200 bg-white p-4 transition-all duration-200 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white p-3 md:p-4 transition-all duration-200 hover:bg-gray-50"
           style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: '80ms' }}
         >
           <div className="flex items-start gap-3">
             <Building2 className="w-4 h-4 text-gray-500 mt-[2px]" />
             <div>
               <div className="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Sucursal</div>
-              <div className="mt-1 text-sm text-gray-900 font-semibold">{t.amv_sucursal || '—'}</div>
+              <div className="mt-1 text-sm text-gray-900 font-semibold break-words">{t.amv_sucursal || '—'}</div>
             </div>
           </div>
         </div>
 
         {/* Estado */}
         <div
-          className="rounded-xl border border-gray-200 bg-white p-4 transition-all duration-200 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white p-3 md:p-4 transition-all duration-200 hover:bg-gray-50"
           style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: '120ms' }}
         >
           <div className="flex items-start gap-3">
@@ -570,12 +589,12 @@ function TicketDetails({ ticket }) {
 
         {/* Descripción del problema - ocupa ancho completo */}
         <div
-          className="rounded-xl border border-gray-200 bg-gray-50 p-5 md:col-span-2"
+          className="rounded-xl border border-gray-200 bg-gray-50 p-4 md:p-5 md:col-span-2"
           style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: '160ms' }}
         >
           <div className="text-[12px] uppercase tracking-wide text-gray-600 font-semibold mb-2">Descripción del problema</div>
-          <div className="min-h-[96px] flex items-center">
-            <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed w-full">
+          <div className="min-h-[80px] md:min-h-[96px] flex items-center">
+            <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed w-full break-words">
               {descripcion ? descripcion : <span className="text-gray-500">Sin descripción.</span>}
             </div>
           </div>
@@ -583,7 +602,7 @@ function TicketDetails({ ticket }) {
 
         {/* Archivos adjuntos */}
         <div
-          className="rounded-xl border border-gray-200 bg-white p-5 md:col-span-2 transition-all duration-200 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white p-4 md:p-5 md:col-span-2 transition-all duration-200 hover:bg-gray-50"
           style={{ animation: 'fadeIn 200ms ease-out both', animationDelay: '200ms' }}
         >
           <VehicularAttachments ticketGuid={t.amv_ticketvehicularid} />
@@ -736,7 +755,7 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
   };
 
   return (
-    <section className="rounded-3xl border border-gray-100 bg-white p-0 overflow-hidden shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18)] md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
+    <section className="rounded-3xl border border-gray-100 bg-white p-0 overflow-visible shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18)] md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
       <div className="px-5 pt-5 pb-3">
         <div className="text-sm font-semibold text-gray-900">Historial de interacciones</div>
       </div>
@@ -823,17 +842,17 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
 
       {/* Barra de input (oculta en solo lectura) */}
       {!readOnly && (
-      <div className="sticky bottom-0 bg-white border-t border-gray-100 shadow-[0_-4px_8px_-6px_rgba(0,0,0,0.15)] px-5 py-3">
+      <div className="sticky bottom-0 z-20 bg-white border-t border-gray-100 shadow-[0_-4px_8px_-6px_rgba(0,0,0,0.15)] -mx-5 px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         <form onSubmit={onSend}>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-3">
             <textarea
-              className="flex-1 max-h-40 min-h-[44px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003594]/40 resize-y"
+              className="flex-1 max-h-40 min-h-[44px] w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003594]/40 resize-y"
               rows={2}
               placeholder="Escribe un mensaje o adjunta archivos…"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />
-            <label className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 cursor-pointer">
+            <label className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 cursor-pointer w-full sm:w-auto">
               <Paperclip className="w-4 h-4" />
               <span className="ml-2">Adjuntar</span>
               <input
@@ -858,7 +877,7 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
             <button
               type="submit"
               disabled={sending || (!comment.trim() && files.length === 0)}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#003594] px-4 py-2 text-white text-sm font-medium disabled:opacity-60 hover:bg-[#002b7a] focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#003594] px-4 py-2 text-white text-sm font-medium disabled:opacity-60 hover:bg-[#002b7a] focus:outline-none focus:ring-2 focus:ring-[#003594]/40 w-full sm:w-auto"
             >
               <Send className="w-4 h-4" />
               {sending ? 'Enviando…' : 'Enviar'}
@@ -987,11 +1006,11 @@ function TicketHeader({ ticketId, zona, onChangeStatus }) {
     if (window && window.history) window.history.back();
   };
   return (
-    <header className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <header className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-3 sm:py-5">
+      <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Detalle de ticket</h1>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Detalle de ticket</h1>
             {zona ? (
               <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-[#003594] ring-1 ring-[#003594]/20">
                 {zona}
@@ -999,7 +1018,7 @@ function TicketHeader({ ticketId, zona, onChangeStatus }) {
             ) : null}
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <p className="text-sm text-gray-500 break-all">{ticketId}</p>
+            <p className="text-xs sm:text-sm text-gray-500 break-all">{ticketId}</p>
             <button
               onClick={copyId}
               className="inline-flex items-center justify-center rounded-md p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
@@ -1015,7 +1034,7 @@ function TicketHeader({ ticketId, zona, onChangeStatus }) {
          
           <button
             onClick={goBack}
-            className="inline-flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+            className="hidden sm:inline-flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver
@@ -1084,7 +1103,7 @@ function StatusModal({ currentStatus, value, onChange, onClose, onConfirm, savin
 
 // Diagnósticos (relación via lookup amv_ticketvehicular)
 function DiagnosticosSection({ ticketCode, ticketGuid, onTicketStatusChange = () => {}, readOnly = false }) {
-  const { fetchVehicularDiagnosticosByTicketCode, createVehicularDiagnostico, updateVehicularDiagnostico, deleteVehicularDiagnostico, searchProveedoresByNombre, updateVehicularTicketStatus } = useDataverseService();
+  const { fetchVehicularDiagnosticosByTicketCode, createVehicularDiagnostico, updateVehicularDiagnostico, deleteVehicularDiagnostico, searchProveedoresByNombre, updateVehicularTicketStatus, updateVehicularTicketFields } = useDataverseService();
   const navigate = useNavigate();
   const apiBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BLOB_API) || 'https://api-parquevehicular.prominox.app';
   const blob = useMemo(() => createBlobClient(apiBase), []);
@@ -1145,12 +1164,12 @@ function DiagnosticosSection({ ticketCode, ticketGuid, onTicketStatusChange = ()
 
   return (
     <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18)] md:shadow-[0_16px_40px_-8px_rgba(16,24,40,0.22)]">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3 md:mb-4">
         <div className="text-lg font-semibold text-gray-900">Diagnósticos</div>
         {!readOnly && (
         <button
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#003594] px-3 py-2 text-white text-sm font-medium hover:bg-[#002b7a] focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#003594] px-3 py-2 text-white text-sm font-medium hover:bg-[#002b7a] focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
         >
           + Agregar diagnóstico
         </button>
@@ -1653,16 +1672,26 @@ function DiagnosticosSection({ ticketCode, ticketGuid, onTicketStatusChange = ()
                         amv_iniciocredito: form.amv_iniciocredito !== '' ? form.amv_iniciocredito : null,
                         proveedorId: selectedProveedor?.id ?? undefined
                       });
-                      setRows(prev => prev.map(x => (x.id === editingId ? { ...x, ...updated } : x)));
-                      // Cambiar estado del ticket a "En proceso" tras guardar edición del diagnóstico
-                      try {
-                        if (ticketGuid) {
-                          await updateVehicularTicketStatus(ticketGuid, 'En proceso');
-                          onTicketStatusChange('En proceso');
+                    setRows(prev => prev.map(x => (x.id === editingId ? { ...x, ...updated } : x)));
+                    // Cambiar estado del ticket a "En proceso" tras guardar edición del diagnóstico
+                    try {
+                      if (ticketGuid) {
+                        await updateVehicularTicketStatus(ticketGuid, 'En proceso');
+                        onTicketStatusChange('En proceso');
+                        // Timestamp de primer diagnóstico (una sola vez)
+                        try {
+                          const firstDiagKey = `__tv_first_diag_ts__:${ticketGuid}`;
+                          if (!sessionStorage.getItem(firstDiagKey)) {
+                            await updateVehicularTicketFields(ticketGuid, { amv_tsprimerdiagnostico: new Date().toISOString() });
+                            try { sessionStorage.setItem(firstDiagKey, '1'); } catch {}
+                          }
+                        } catch (e) {
+                          console.warn('[DiagnosticosSection] No se pudo registrar amv_tsprimerdiagnostico:', e?.message || e);
                         }
-                      } catch (e) {
-                        console.warn('[DiagnosticosSection] No se pudo actualizar estado a En proceso:', e?.message || e);
                       }
+                    } catch (e) {
+                      console.warn('[DiagnosticosSection] No se pudo actualizar estado a En proceso:', e?.message || e);
+                    }
                     } else {
                       if (!ticketGuid) { alert('No hay GUID del ticket vehicular.'); return; }
                     const created = await createVehicularDiagnostico({
@@ -1679,6 +1708,16 @@ function DiagnosticosSection({ ticketCode, ticketGuid, onTicketStatusChange = ()
                         if (ticketGuid) {
                           await updateVehicularTicketStatus(ticketGuid, 'En proceso');
                           onTicketStatusChange('En proceso');
+                          // Timestamp de primer diagnóstico (una sola vez)
+                          try {
+                            const firstDiagKey = `__tv_first_diag_ts__:${ticketGuid}`;
+                            if (!sessionStorage.getItem(firstDiagKey)) {
+                              await updateVehicularTicketFields(ticketGuid, { amv_tsprimerdiagnostico: new Date().toISOString() });
+                              try { sessionStorage.setItem(firstDiagKey, '1'); } catch {}
+                            }
+                          } catch (e) {
+                            console.warn('[DiagnosticosSection] No se pudo registrar amv_tsprimerdiagnostico:', e?.message || e);
+                          }
                         }
                       } catch (e) {
                         console.warn('[DiagnosticosSection] No se pudo actualizar estado a En proceso:', e?.message || e);

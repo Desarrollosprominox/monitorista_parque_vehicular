@@ -4,6 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import Sidebar from '../components/Sidebar';
 import { useDataverseService } from '../services/dataverseService';
 
+// Agrupación de estados: Pendiente + En Revisión + En proceso
+const PEND_GROUP = '__grp_pend__';
 function SolicitudesPendientes({ adminMode = false }) {
   const { isAuthenticated, login, user, role } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
@@ -24,6 +26,9 @@ function SolicitudesPendientes({ adminMode = false }) {
       return '';
     }
   });
+  // UI móvil
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const inFlightRef = useRef(false);
   // Filtros UI
@@ -31,8 +36,8 @@ function SolicitudesPendientes({ adminMode = false }) {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sucursalFilter, setSucursalFilter] = useState('');
   const { fetchVehicularTickets, fetchMonitoristaZonaByEmail } = useDataverseService();
-  // Tab de estado (fuente de verdad visual): 'Pendiente' | 'Por aprobar' | 'Aprobado'
-  const [activeTabEstado, setActiveTabEstado] = useState(adminMode ? 'Por aprobar' : 'Pendiente');
+  // Tab de estado (fuente de verdad visual)
+  const [activeTabEstado, setActiveTabEstado] = useState(adminMode ? 'Por aprobar' : PEND_GROUP);
   const didSetInitialTabRef = useRef(false);
 
   // Inyectar fuente Inter si no existe
@@ -174,7 +179,11 @@ function SolicitudesPendientes({ adminMode = false }) {
       ].some(v => (v || '').toString().toLowerCase().includes(q));
       const matchesPriority = !priorityFilter || normalize(r.amv_prioridad) === normalize(priorityFilter);
       // Filtro centralizado por estado: debe cumplir pestaña activa y, si existe, el dropdown
-      const matchesTab = !tabStatus || rowEstado === tabStatus;
+      const matchesTab = !tabStatus
+        ? true
+        : (tabStatus === (PEND_GROUP.toLowerCase())
+          ? (rowEstado === 'pendiente' || rowEstado === 'en revisión' || rowEstado === 'en revision' || rowEstado === 'en proceso')
+          : rowEstado === tabStatus);
       const matchesSucursal = !sucursalFilter || (r.amv_sucursal || '').toString() === sucursalFilter;
       return matchesQuery && matchesPriority && matchesTab && matchesSucursal;
     });
@@ -247,19 +256,58 @@ function SolicitudesPendientes({ adminMode = false }) {
   }
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial' }}>
+    <div className="min-h-screen sm:bg-white bg-gray-50" style={{ fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial' }}>
       <Sidebar onCollapse={setIsSidebarCollapsed} />
       <main
         className={`transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'ml-16' : 'ml-64'
           }`}
       >
-        {/* Header / Topbar */}
-        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        {/* Header / Topbar (mobile-first, sin romper desktop) */}
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-3 sm:py-5 relative">
+          <div className="flex items-center sm:hidden justify-between">
+            <div className="min-w-0 flex-1 pr-2">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-base font-semibold text-gray-900">{(adminMode || String(role || '').toLowerCase() === 'admin') ? 'Tickets por aprobar' : 'Tickets vehiculares'}</h1>
+                {(adminMode || String(role || '').toLowerCase() === 'admin' || zona) && (
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-[#003594] ring-1 ring-[#003594]/20">
+                    {(adminMode || String(role || '').toLowerCase() === 'admin') ? 'Global' : `Zona ${zona}`}
+                  </span>
+                )}
+              </div>
+              <p className="text-[12px] text-gray-500">Gestión por zona</p>
+            </div>
+            {/* Menú ⋮ móvil */}
+            <div className="relative">
+              <button
+                onClick={() => setMobileMenuOpen(v => !v)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100"
+                aria-label="Abrir menú"
+                title="Menú"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="19" r="1.5" />
+                </svg>
+              </button>
+              {mobileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-gray-200 bg-white shadow-lg z-20">
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); exportCSV(); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Exportar CSV
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop layout intacto */}
+          <div className="hidden sm:flex sm:flex-col sm:gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{(adminMode || String(role || '').toLowerCase() === 'admin') ? 'Tickets vehiculares por aprobar' : 'Tickets vehiculares'}</h1>
-
                 {(adminMode || String(role || '').toLowerCase() === 'admin' || zona) && (
                   <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-[#003594] ring-1 ring-[#003594]/20">
                     {(adminMode || String(role || '').toLowerCase() === 'admin') ? 'Global' : `Zona ${zona}`}
@@ -271,7 +319,7 @@ function SolicitudesPendientes({ adminMode = false }) {
             <div className="flex items-center gap-2">
               <button
                 onClick={exportCSV}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 sm:px-4 py-2 text-gray-700 text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+                className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 sm:px-4 py-2 text-gray-700 text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
                 aria-label="Exportar tickets a CSV"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -287,10 +335,12 @@ function SolicitudesPendientes({ adminMode = false }) {
 
         <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
           {/* Tabs por amv_estado */}
-          <TabsEstado
-            value={activeTabEstado}
-            onChange={setActiveTabEstado}
-          />
+          <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
+            <TabsEstado
+              value={activeTabEstado}
+              onChange={setActiveTabEstado}
+            />
+          </div>
 
           {/* Métricas / Cards */}
           {isLoading ? (
@@ -299,17 +349,28 @@ function SolicitudesPendientes({ adminMode = false }) {
             <StatsCards metrics={metrics} />
           )}
 
-          {/* Filtros */}
-          <TicketsFilters
-            query={query}
-            setQuery={setQuery}
-            priority={priorityFilter}
-            setPriority={setPriorityFilter}
-            sucursal={sucursalFilter}
-            setSucursal={setSucursalFilter}
-            sucursalOptions={sucursalOptions}
-            clearFilters={clearFilters}
-          />
+          {/* Filtros: móvil como botón + bottom sheet; desktop intacto */}
+          <div className="sm:hidden">
+            <button
+              onClick={() => setMobileFiltersOpen(true)}
+              className="w-full inline-flex items-center justify-center rounded-xl bg-gray-100 text-gray-800 px-4 py-3 text-sm font-medium"
+            >
+              🔍 Filtros
+            </button>
+          </div>
+
+          <div className="hidden sm:block">
+            <TicketsFilters
+              query={query}
+              setQuery={setQuery}
+              priority={priorityFilter}
+              setPriority={setPriorityFilter}
+              sucursal={sucursalFilter}
+              setSucursal={setSucursalFilter}
+              sucursalOptions={sucursalOptions}
+              clearFilters={clearFilters}
+            />
+          </div>
 
           {/* Tabla / Estados */}
           <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100">
@@ -323,12 +384,83 @@ function SolicitudesPendientes({ adminMode = false }) {
                 ) : filteredRows.length === 0 ? (
                   <EmptyState onClear={clearFilters} />
                 ) : (
-                  <TicketsTable rows={filteredRows} />
+                  <>
+                    {/* Móvil: tarjetas; Desktop: tabla existente */}
+                    <div className="block sm:hidden p-4">
+                      <TicketsCards rows={filteredRows} />
+                    </div>
+                    <div className="hidden sm:block">
+                      <TicketsTable rows={filteredRows} />
+                    </div>
+                  </>
                 )}
               </div>
             )}
           </div>
         </div>
+
+        {/* Bottom sheet de filtros (móvil) */}
+        {mobileFiltersOpen && (
+          <div className="fixed inset-0 z-40 sm:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setMobileFiltersOpen(false)}></div>
+            <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[75vh] overflow-y-auto">
+              <div className="mx-auto max-w-md">
+                <div className="h-1.5 w-10 bg-gray-200 rounded-full mx-auto mb-3" />
+                <div className="text-base font-semibold text-gray-900 mb-3">Filtros</div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="sr-only">Buscar</label>
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Buscar por ID, vehículo, sucursal…"
+                      className="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-[#003594]/40 focus:border-[#003594] text-sm px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-[#003594]/40 focus:border-[#003594] text-sm px-3 py-2"
+                    >
+                      <option value="">Prioridad</option>
+                      <option value="Crítica">Crítica</option>
+                      <option value="Alta">Alta</option>
+                      <option value="Media">Media</option>
+                      <option value="Baja">Baja</option>
+                    </select>
+                  </div>
+                  <div>
+                    <select
+                      value={sucursalFilter}
+                      onChange={(e) => setSucursalFilter(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-[#003594]/40 focus:border-[#003594] text-sm px-3 py-2"
+                    >
+                      <option value="">Sucursal</option>
+                      {sucursalOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={() => { clearFilters(); setMobileFiltersOpen(false); }}
+                      className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+                    >
+                      Limpiar
+                    </button>
+                    <button
+                      onClick={() => setMobileFiltersOpen(false)}
+                      className="inline-flex items-center rounded-lg bg-[#003594] px-4 py-2 text-sm font-medium text-white hover:bg-[#002b7a] focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -338,26 +470,36 @@ export default SolicitudesPendientes;
 
 // Subcomponentes UI
 function TabsEstado({ value, onChange }) {
+  const containerRef = useRef(null);
+  const btnRefs = useRef({});
+  const handleChange = (val) => {
+    onChange(val);
+    try {
+      const el = btnRefs.current[val];
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    } catch { }
+  };
   const tabs = [
-    { label: 'Pendientes', value: 'Pendiente' },
-    { label: 'En revisión', value: 'En Revisión' },
-    { label: 'En proceso', value: 'En proceso' },
+    { label: 'Pendientes', value: PEND_GROUP },
     { label: 'Por aprobar', value: 'Por aprobar' },
     { label: 'Aprobados', value: 'Aprobado' },
     { label: 'Registrados por contabilidad', value: 'Registrado por contabilidad' },
   ];
   return (
-    <div className="flex items-center gap-2">
+    <div ref={containerRef} className="flex items-center gap-2 overflow-x-auto whitespace-nowrap snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
       {tabs.map(t => {
         const active = value === t.value;
         return (
           <button
             key={t.value}
-            onClick={() => onChange(t.value)}
-            className={`inline-flex items-center rounded-full px-3.5 py-1.5 text-sm ring-1 transition-colors
+            ref={(el) => { if (el) btnRefs.current[t.value] = el; }}
+            onClick={() => handleChange(t.value)}
+            className={`shrink-0 snap-center inline-flex items-center rounded-full px-4 py-2 text-sm ring-1 transition-colors
               ${active
                 ? 'bg-[#003594] text-white ring-[#003594]'
-                : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+                : 'bg-gray-100 text-[#003594] ring-gray-200 hover:bg-gray-200'
               }`}
           >
             {t.label}
@@ -377,9 +519,9 @@ function StatsCards({ metrics }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {items.map((it) => (
-        <div key={it.label} className="rounded-2xl border border-gray-100 bg-white shadow-sm p-4">
-          <div className="text-sm text-gray-600">{it.label}</div>
-          <div className="mt-2 text-2xl font-semibold text-gray-900">{it.value}</div>
+        <div key={it.label} className="rounded-2xl border border-gray-100 bg-white shadow-sm p-3 sm:p-4">
+          <div className="text-xs sm:text-sm text-gray-600">{it.label}</div>
+          <div className="mt-1 sm:mt-2 text-2xl sm:text-2xl font-semibold text-gray-900">{it.value}</div>
         </div>
       ))}
     </div>
@@ -540,8 +682,6 @@ function TicketsTable({ rows }) {
               <td className="px-4 py-3 font-medium text-gray-900">
                 <Link
                   to={`/vehicular/${encodeURIComponent(r.amv_ticket)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   state={{ ticket: r }}
                   className="text-[#003594] hover:underline"
                   aria-label={`Abrir detalle del ticket ${r.amv_ticket} en nueva pestaña`}
@@ -568,5 +708,67 @@ function TicketsTable({ rows }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+// Tarjetas móviles para resultados
+function TicketsCards({ rows }) {
+  const priorityClasses = (p) => {
+    const v = (p || '').toString().toLowerCase();
+    if (v === 'crítica') return 'bg-red-50 text-red-700 ring-red-200';
+    if (v === 'alta') return 'bg-orange-50 text-orange-700 ring-orange-200';
+    if (v === 'media') return 'bg-yellow-50 text-yellow-700 ring-yellow-200';
+    if (v === 'baja') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+    return 'bg-gray-50 text-gray-700 ring-gray-200';
+  };
+  const estadoClasses = (e) => {
+    const v = (e || '').toString().toLowerCase();
+    if (v.includes('pend')) return 'bg-blue-50 text-blue-700 ring-blue-200';
+    if (v.includes('por aprobar')) return 'bg-amber-50 text-amber-800 ring-amber-200';
+    if (v.includes('registrado por contabilidad')) return 'bg-indigo-50 text-indigo-700 ring-indigo-200';
+    if (v.includes('revisión') || v.includes('revision') || v.includes('proceso')) return 'bg-sky-50 text-sky-700 ring-sky-200';
+    if (v.includes('aprob')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+    if (v.includes('resuelta')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+    return 'bg-gray-50 text-gray-700 ring-gray-200';
+  };
+  return (
+    <ul className="space-y-5">
+      {rows.map((r, idx) => (
+        <li key={idx} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[15px] font-semibold text-gray-900 leading-5 truncate">#{r.amv_ticket}</div>
+              <div className="mt-1 text-xs text-gray-600 truncate">{r.amv_vehiculod || '—'}</div>
+              <div className="mt-0.5 text-xs text-gray-600 truncate">{r.amv_tipodeservicio || '—'}</div>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${priorityClasses(r.amv_prioridad)}`}>
+                  {r.amv_prioridad || '—'}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${estadoClasses(r.amv_estado)}`}>
+                  {r.amv_estado || '—'}
+                </span>
+              </div>
+            </div>
+            <Link
+              to={`/vehicular/${encodeURIComponent(r.amv_ticket)}`}
+              state={{ ticket: r }}
+              className="shrink-0 inline-flex items-center rounded-lg bg-[#003594] px-3 py-2 text-xs font-medium text-white hover:bg-[#002b7a] focus:outline-none focus:ring-2 focus:ring-[#003594]/40"
+              aria-label={`Abrir detalle del ticket ${r.amv_ticket}`}
+            >
+              Ver
+            </Link>
+          </div>
+          {r.amv_descripciondelproblema ? (
+            <div
+              className="mt-3 text-xs text-gray-700"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+            >
+              {r.amv_descripciondelproblema}
+            </div>
+          ) : null}
+          <div className="mt-2 text-[11px] text-gray-500">{r.amv_sucursal || '—'}</div>
+        </li>
+      ))}
+    </ul>
   );
 }

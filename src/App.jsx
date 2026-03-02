@@ -110,6 +110,16 @@ function App() {
         });
 
         await instance.initialize();
+        // Procesa el redirect de MSAL y fija la cuenta activa si existe
+        try {
+          await instance.handleRedirectPromise();
+          const accounts = instance.getAllAccounts();
+          if (accounts && accounts.length > 0) {
+            instance.setActiveAccount(accounts[0]);
+          }
+        } catch (e) {
+          console.warn('MSAL handleRedirectPromise warning:', e?.message || e);
+        }
         setMsalInstance(instance);
       } catch (error) {
         console.error("Error initializing MSAL:", error);
