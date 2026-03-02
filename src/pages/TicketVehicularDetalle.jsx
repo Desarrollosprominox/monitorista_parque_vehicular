@@ -758,11 +758,7 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
         await fetch(flowUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticketVehicularId: cleanTicket,
-            interactionId: created?.id || newItem.id,
-            comentario: newItem.comentario || ''
-          })
+          body: JSON.stringify({ ticketId: cleanTicket })
         });
       } catch (notifyErr) {
         console.warn('[InteraccionesHistorial] No se pudo notificar flujo de nueva interacción:', notifyErr?.message || notifyErr);
