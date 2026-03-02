@@ -131,6 +131,9 @@ function TicketVehicularDetalle() {
             <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto space-y-6">
               <VehiculoDetails vehiculo={ticket.vehiculo} />
               <TicketDetails ticket={ticket} />
+              {String(role || '').toLowerCase() === 'admin' && (
+                <TimeMarksSection ticket={ticket} />
+              )}
               <DiagnosticosSection
                 ticketCode={ticket.amv_ticket}
                 ticketGuid={ticket.amv_ticketvehicularid}
@@ -747,6 +750,23 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
       // 3) Agregar optimistamente al listado
       setItems(prev => [...prev, newItem]);
       setFiles([]);
+
+      // 4) Desencadenar flujo de Power Automate al crear una nueva interacción
+      try {
+        const flowUrl = 'https://defaultdcbc0cef7e0e48419a93633aa4c88b.bf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/d1881f9b5fcb4645866c14cefab2f089/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=hfLNiGoXPALVyyD63V3crwnsGbB0ASrdjrlR_3azjEM';
+        const cleanTicket = (ticketVehicularId || '').toString().replace(/[{}"]/g, '');
+        await fetch(flowUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticketVehicularId: cleanTicket,
+            interactionId: created?.id || newItem.id,
+            comentario: newItem.comentario || ''
+          })
+        });
+      } catch (notifyErr) {
+        console.warn('[InteraccionesHistorial] No se pudo notificar flujo de nueva interacción:', notifyErr?.message || notifyErr);
+      }
     } catch (e) {
       console.error('[InteraccionesHistorial] No se pudo enviar interacción:', e);
     } finally {
@@ -2024,3 +2044,41 @@ function DiagnosticoUploadModal({ open, onClose, ticketGuid, diagnosticoId, diag
 
 export default TicketVehicularDetalle;
 
+// Marcas de tiempo (solo admin)
+function TimeMarksSection({ ticket }) {
+  const get = (keys = []) => {
+    for (const k of keys) {
+      const v = ticket?.[k];
+      if (v) return v;
+    }
+    return null;
+  };
+  const fmt = (v) => {
+    if (!v) return '—';
+    try { return new Date(v).toLocaleString(); } catch { return String(v); }
+  };
+  const items = [
+    { label: 'Creado', value: fmt(get(['createdon'])) },
+    { label: 'Abierto por primera vez', value: fmt(get(['amv_tsabierto'])) },
+    { label: 'Primer diagnóstico realizado', value: fmt(get(['amv_tsprimerdiagnostico'])) },
+    { label: 'Enviado a aprobación', value: fmt(get(['amv_tsmandadoaaprobacion'])) },
+    { label: 'Aprobado', value: fmt(get(['amv_tsaprobado'])) },
+    { label: 'Rechazado', value: fmt(get(['amv_tsrechazado'])) },
+    { label: 'Enviado a contabilidad', value: fmt(get(['amv_tsenviadoacontabilidad'])) },
+    { label: 'Registrado por contabilidad', value: fmt(get(['amv_tsregistradoencontabilidad'])) },
+    { label: 'Registrado por cuentas por pagar y resuelto', value: fmt(get(['amv_tsregistradoporcuentas'])) },
+  ];
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-4 md:p-6 shadow-sm">
+      <div className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">Marcas de tiempo</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {items.map((it, idx) => (
+          <div key={idx} className="rounded-xl border border-gray-100 bg-[#F9FAFB] px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-gray-600 font-medium">{it.label}</div>
+            <div className="mt-1 text-sm text-gray-900">{it.value}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

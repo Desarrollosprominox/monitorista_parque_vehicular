@@ -222,7 +222,7 @@ export function useDataverseService() {
       }
       const safeCode = String(ticketCode).replace(/'/g, "''");
       // Traemos el ticket y el GUID del lookup. Luego pedimos el vehículo por separado usando ese GUID.
-      const query = `?$select=amv_ticket,amv_ticketvehicularid,_amv_vehiculod_value,amv_tipodeservicio,amv_prioridad,amv_descripciondelproblema,amv_sucursal,amv_estado,amv_zona&$filter=amv_ticket eq '${safeCode}'&$top=1`;
+      const query = `?$select=amv_ticket,amv_ticketvehicularid,_amv_vehiculod_value,amv_tipodeservicio,amv_prioridad,amv_descripciondelproblema,amv_sucursal,amv_estado,amv_zona,createdon,amv_tsabierto,amv_tsprimerdiagnostico,amv_tsmandadoaaprobacion,amv_tsaprobado,amv_tsrechazado,amv_tsenviadoacontabilidad,amv_tsregistradoencontabilidad,amv_tsregistradoporcuentas&$filter=amv_ticket eq '${safeCode}'&$top=1`;
       const url = `${DATAVERSE_API_ENDPOINT}/amv_ticketvehiculars${query}`;
       const response = await fetch(url, {
         headers: {
@@ -284,6 +284,15 @@ export function useDataverseService() {
         amv_sucursal: item.amv_sucursal ?? '',
         amv_estado: item.amv_estado ?? '',
         amv_zona: item['amv_zona@OData.Community.Display.V1.FormattedValue'] ?? item.amv_zona ?? '',
+        createdon: item.createdon ?? null,
+        amv_tsabierto: item.amv_tsabierto ?? null,
+        amv_tsprimerdiagnostico: item.amv_tsprimerdiagnostico ?? null,
+        amv_tsmandadoaaprobacion: item.amv_tsmandadoaaprobacion ?? null,
+        amv_tsaprobado: item.amv_tsaprobado ?? null,
+        amv_tsrechazado: item.amv_tsrechazado ?? null,
+        amv_tsenviadoacontabilidad: item.amv_tsenviadoacontabilidad ?? null,
+        amv_tsregistradoencontabilidad: item.amv_tsregistradoencontabilidad ?? null,
+        amv_tsregistradoporcuentas: item.amv_tsregistradoporcuentas ?? null,
         vehiculo
       };
     } catch (error) {
