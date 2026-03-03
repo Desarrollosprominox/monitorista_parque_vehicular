@@ -14,8 +14,17 @@ function ProveedorNuevo() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // API de blob configurable o proxy
-  const apiBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BLOB_API) || 'https://api-parquevehicular.prominox.app';
+  // API de blob configurable o proxy (localhost:3001 en desarrollo)
+  const apiBase = (() => {
+    const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : null;
+    const base = env && env.VITE_BLOB_API ? env.VITE_BLOB_API : '';
+    if (base) return base;
+    try {
+      const host = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3001';
+    } catch {}
+    return 'https://api-parquevehicular.prominox.app';
+  })();
   const blob = createBlobClient(apiBase);
 
   // Estado de documentos

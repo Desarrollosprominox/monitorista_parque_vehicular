@@ -8,6 +8,21 @@ import { calculateRemainingCreditDays } from '../utils/dateUtils';
 import { createBlobClient } from '../services/blobClient';
 import { useBlobFiles } from '../hooks/useBlobFiles';
 
+// Resolver base del servidor de Blob:
+// - Si VITE_BLOB_API está definido, usarlo
+// - Si estamos en localhost, usar http://localhost:3001
+// - En otro caso, usar la URL productiva
+function resolveBlobApiBase() {
+  const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : null;
+  const envBase = env && env.VITE_BLOB_API ? env.VITE_BLOB_API : '';
+  if (envBase) return envBase;
+  try {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3001';
+  } catch {}
+  return 'https://api-parquevehicular.prominox.app';
+}
+
 function TicketVehicularDetalle() {
   const { isAuthenticated, login, role } = useAuth();
   const { ticketId } = useParams();
@@ -324,7 +339,7 @@ function PaymentProofSection({ ticketGuid }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const cleanId = (ticketGuid || '').toString().replace(/[{}"]/g, '');
-  const apiBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BLOB_API) || 'https://api-parquevehicular.prominox.app';
+  const apiBase = resolveBlobApiBase();
 
   const fetchList = async () => {
     if (!cleanId) { setFiles([]); setLoading(false); return; }
@@ -619,7 +634,7 @@ function TicketDetails({ ticket }) {
 function InteraccionesHistorial({ ticket, readOnly = false }) {
   const { user, isAuthenticated } = useAuth();
   const { fetchVehicularInteractions, createVehicularInteraction } = useDataverseService();
-  const apiBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BLOB_API) || 'https://api-parquevehicular.prominox.app';
+  const apiBase = resolveBlobApiBase();
   const blob = useMemo(() => createBlobClient(apiBase), []);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -818,6 +833,7 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
                       </div>
                     )}
                     <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed">{it.comentario || ''}</div>
+                    {/* Adjuntos recién subidos en esta sesión */}
                     {Array.isArray(it.attachments) && it.attachments.length > 0 && (
                       <ul className="mt-2 space-y-1">
                         {it.attachments.map((a, idx) => (
@@ -843,6 +859,8 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
                         ))}
                       </ul>
                     )}
+                    {/* Adjuntos ya existentes en blob para esta interacción */}
+                    <InteractionAttachmentsList blob={blob} ticketVehicularId={ticketVehicularId} interactionId={it.id} />
                   </div>
                   {isOwn && (
                     <div className="ml-2 flex-shrink-0 w-8 h-8 rounded-full bg-[#003594] text-white flex items-center justify-center text-xs font-semibold">
@@ -930,6 +948,86 @@ function InteraccionesHistorial({ ticket, readOnly = false }) {
       </div>
       )}
     </section>
+  );
+}
+
+// Lista de adjuntos en blob por interacción
+function InteractionAttachmentsList({ blob, ticketVehicularId, interactionId }) {
+  const cleanTicket = (ticketVehicularId || '').toString().replace(/[{}]/g, '');
+  const [files, setFiles] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const apiBase = resolveBlobApiBase();
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoaded(false);
+        if (!cleanTicket || !interactionId) { setFiles([]); setLoaded(true); return; }
+        // 1) Endpoint dedicado
+        const url = `${apiBase}/blob/interactions/list?ticketId=${encodeURIComponent(cleanTicket)}&interactionId=${encodeURIComponent(interactionId)}`;
+        let res = await fetch(url);
+        let arr = [];
+        if (res.ok) {
+          const data = await res.json();
+          arr = Array.isArray(data?.blobs) ? data.blobs : [];
+        }
+        // 2) Fallback: listar por prefijo directo si el endpoint no arrojó resultados
+        if ((!arr || arr.length === 0)) {
+          const tryPrefixes = [
+            `Tickets/${interactionId}/Interacciones/${interactionId}`, // improbable, pero defensivo
+            `Tickets/${cleanTicket}/Interacciones/${interactionId}`,
+            `tickets/${String(cleanTicket).toLowerCase()}/interacciones/${String(interactionId).toLowerCase()}`
+          ];
+          for (const p of tryPrefixes) {
+            const listUrl = `${apiBase}/blob/list?prefix=${encodeURIComponent(p)}`;
+            const r = await fetch(listUrl);
+            if (r.ok) {
+              const j = await r.json();
+              const blobs = Array.isArray(j?.blobs) ? j.blobs : (Array.isArray(j?.items) ? j.items : []);
+              if (blobs.length > 0) { arr = blobs; break; }
+            }
+          }
+        }
+        if (active) setFiles(arr);
+      } catch {
+        if (active) setFiles([]);
+      } finally {
+        if (active) setLoaded(true);
+      }
+    })();
+    return () => { active = false; };
+  }, [apiBase, cleanTicket, interactionId]);
+  if (!loaded || !files || files.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1">
+      {files.map((f) => (
+        <li key={f.name || f.blobName} className="flex items-center justify-between rounded-md border border-gray-200 bg-white/60 px-2 py-1">
+          <div className="min-w-0 truncate text-xs text-gray-800">{f.fileName || f.name || 'archivo'}</div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.open(f.downloadUrl || f.blobUrl, '_blank', 'noopener,noreferrer')}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Abrir
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const suggested =
+                  (f.fileName && String(f.fileName)) ||
+                  decodeURIComponent(String(f.name || f.blobName || '').split('/').pop() || '') ||
+                  'archivo';
+                blob.downloadFile(f.blobName || f.name, suggested);
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Download className="w-3.5 h-3.5" /> Descargar
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
